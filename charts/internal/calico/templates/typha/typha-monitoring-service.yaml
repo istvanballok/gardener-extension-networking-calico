@@ -1,4 +1,4 @@
-{{- if .Values.config.monitoring.enabled }}
+{{- if and .Values.config.monitoring.enabled .Values.config.typha.enabled }}
 ---
 apiVersion: v1
 kind: Service
