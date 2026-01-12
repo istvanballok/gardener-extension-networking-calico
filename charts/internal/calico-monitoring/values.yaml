@@ -1,0 +1,7 @@
+config:
+  monitoring:
+    enabled: true
+  typha:
+    enabled: true
+  birdExporter:
+    enabled: false

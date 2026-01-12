@@ -40,6 +40,12 @@ type calicoConfig struct {
 	Multus          multus                 `json:"multus"`
 }
 
+type calicoMonitoringConfig struct {
+	Monitoring   monitoring   `json:"monitoring"`
+	BirdExporter birdExporter `json:"birdExporter"`
+	Typha        typha        `json:"typha"`
+}
+
 type felix struct {
 	IPInIP                      felixIPinIP                      `json:"ipinip"`
 	BPF                         felixBPF                         `json:"bpf"`
@@ -154,8 +160,24 @@ var defaultCalicoConfig = calicoConfig{
 	},
 }
 
+var defaultCalicoMonitoringConfig = calicoMonitoringConfig{
+	Monitoring: monitoring{
+		Enabled: true,
+	},
+	Typha: typha{
+		Enabled: true,
+	},
+	BirdExporter: birdExporter{
+		Enabled: false,
+	},
+}
+
 func newCalicoConfig() calicoConfig {
 	return defaultCalicoConfig
+}
+
+func newCalicoMonitoringConfig() calicoMonitoringConfig {
+	return defaultCalicoMonitoringConfig
 }
 
 func (c *calicoConfig) toMap() (map[string]interface{}, error) {
@@ -167,6 +189,19 @@ func (c *calicoConfig) toMap() (map[string]interface{}, error) {
 	err = json.Unmarshal(bytes, &configMap)
 	if err != nil {
 		return nil, fmt.Errorf("could not unmarshal calico config: %v", err)
+	}
+	return configMap, nil
+}
+
+func (c *calicoMonitoringConfig) toMap() (map[string]interface{}, error) {
+	bytes, err := json.Marshal(c)
+	if err != nil {
+		return nil, fmt.Errorf("could not marshal calico monitoring config: %v", err)
+	}
+	var configMap map[string]interface{}
+	err = json.Unmarshal(bytes, &configMap)
+	if err != nil {
+		return nil, fmt.Errorf("could not unmarshal calico monitoring config: %v", err)
 	}
 	return configMap, nil
 }
@@ -442,6 +477,27 @@ func mergeCalicoValuesWithConfig(c *calicoConfig, config *calicov1alpha1.Network
 	}
 
 	return c, nil
+}
+
+// ComputeCalicoMonitoringChartValues computes the values for the calico monitoring chart.
+func ComputeCalicoMonitoringChartValues(config *calicov1alpha1.NetworkConfig) (map[string]interface{}, error) {
+	typedConfig := newCalicoMonitoringConfig()
+	if config != nil {
+		if config.Typha != nil {
+			typedConfig.Typha.Enabled = config.Typha.Enabled
+		}
+		if config.BirdExporter != nil {
+			typedConfig.BirdExporter.Enabled = config.BirdExporter.Enabled
+		}
+	}
+	calicoCfg, err := typedConfig.toMap()
+	if err != nil {
+		return nil, fmt.Errorf("could not convert calico monitoring config: %v", err)
+	}
+	calicoChartValues := map[string]interface{}{
+		"config": calicoCfg,
+	}
+	return calicoChartValues, nil
 }
 
 func calculateResourceRequests(resources *calicov1alpha1.Resources) map[string]interface{} {

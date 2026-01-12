@@ -39,7 +39,7 @@ const (
 	CalicoConfigManagedResourceName = "extension-networking-calico-config"
 )
 
-func applyMonitoringConfig(ctx context.Context, seedClient client.Client, chartApplier gardenerkubernetes.ChartApplier, network *extensionsv1alpha1.Network, deleteChart bool) error {
+func applyMonitoringConfig(ctx context.Context, seedClient client.Client, chartApplier gardenerkubernetes.ChartApplier, network *extensionsv1alpha1.Network, networkConfig *calicov1alpha1.NetworkConfig, deleteChart bool) error {
 	calicoControlPlaneMonitoringChart := &chart.Chart{
 		Name:       calico.MonitoringName,
 		EmbeddedFS: charts.InternalChart,
@@ -81,7 +81,11 @@ func applyMonitoringConfig(ctx context.Context, seedClient client.Client, chartA
 		return client.IgnoreNotFound(calicoControlPlaneMonitoringChart.Delete(ctx, seedClient, network.Namespace))
 	}
 
-	return calicoControlPlaneMonitoringChart.Apply(ctx, chartApplier, network.Namespace, nil, "", "", nil)
+	chartValues, err := chartspkg.ComputeCalicoMonitoringChartValues(networkConfig)
+	if err != nil {
+		return fmt.Errorf("could not compute calico monitoring chart values: %w", err)
+	}
+	return calicoControlPlaneMonitoringChart.Apply(ctx, chartApplier, network.Namespace, nil, "", "", chartValues)
 }
 
 // Reconcile implements Network.Actuator.
@@ -208,7 +212,7 @@ func (a *actuator) Reconcile(ctx context.Context, _ logr.Logger, network *extens
 		return err
 	}
 
-	if err := applyMonitoringConfig(ctx, a.client, a.chartApplier, network, false); err != nil {
+	if err := applyMonitoringConfig(ctx, a.client, a.chartApplier, network, networkConfig, false); err != nil {
 		return err
 	}
 
