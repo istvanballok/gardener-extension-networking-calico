@@ -8,7 +8,7 @@
 
 The Prometheus scrape configurations for the calico components are deployed unconditionally, even when the respective components are disabled. This can lead to empty Prometheus scrape pools that fail the new Prometheus health checks that are introduced with the gardener/gardener PR [#13341](https://github.com/gardener/gardener/pull/13341).
 
-Specifically, the bird exporter is disabled by default, but its scrape configuration is nevertheless deployed unconditionally. During a gardener/gardener PR validation, the respective empty scrape pool would report a health check failure. As a mitigation, an exception was added to ignore the empty scrape pool for the `shoot-calico-bird` scrape job. The Prometheus health checks are controlled via a feature gate: they are enabled during PR validation but remain disabled in production landscapes, allowing findings like this to be collected and resolved without time pressure.
+Specifically, the bird exporter is disabled by default, but its scrape configuration is nevertheless deployed unconditionally. During a gardener/gardener PR validation, the respective empty scrape pool would report a health check failure. As a mitigation, an exception was added to ignore the empty scrape pool for the `shoot-calico-bird` scrape job. The Prometheus health checks are controlled via a feature gate: they are enabled during PR validation. They shall remain disabled in production landscapes, until findings like this one are collected and resolved without time pressure.
 
 This issue is about fixing the root cause for the unconditionally deployed scrape configurations in this extension.
 
@@ -22,10 +22,13 @@ The Prometheus scrape configurations should only be deployed when their correspo
 
 **How to reproduce it (as minimally and precisely as possible)**:
 
-1. Create a shoot cluster in the local setup without enabling the bird exporter (the default configuration: the `.spec.networking.providerConfig.birdExporter.enabled` property of the `Shoot` resource is not set to `true`).
+1. Create a shoot cluster in the local setup without enabling the bird exporter (the default configuration)
+   - The `.spec.networking.providerConfig.birdExporter.enabled` property of the `Shoot` resource is not set to `true`.
 2. Check the scrape configurations in the shoot's control plane: `kubectl get -n shoot--local--local scrapeconfigs.monitoring.coreos.com | grep calico`.
    - Observe that the `shoot-calico-bird` scrape configuration is deployed.
-3. Check the shoot cluster's services: `kubectl --kubeconfig admin-kubeconf.yaml get svc -n kube-system | grep bird`.
+3. Check the shoot cluster's services:
+   - `hack/usage/generate-admin-kubeconf.sh > admin-kubeconf.yaml`
+   - `kubectl --kubeconfig admin-kubeconf.yaml get svc -n kube-system | grep bird`
    - Observe that no `calico-bird-monitoring` service exists.
 4. Access the Prometheus UI: `kubectl port-forward -n shoot--local--local prometheus-shoot-0 9090`.
    - Observe that the `bird-metrics` scrape job has no targets.
